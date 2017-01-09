@@ -46,14 +46,15 @@ end
 -- @return only the `body` element will be returned, or nil+error
 _M.fetch_data = function(auth_data)
   -- first get authorization token
-  local auth, success, status, _, _ = authorize(
+  local json_body, success, status, _, _ = authorize(
     "/oauth2/token", auth_data)
   if not success then
     return nil, status
   end
-  auth = json.decode(table.concat(auth))
+  json_body = table.concat(json_body)
+  local auth, err = json.decode(json_body)
   if not auth then
-    return nil, "failed decoding authorization json"
+    return nil, "failed decoding authorization with '"..tostring(err).."' for: "..tostring(json_body)
   end
 
   -- fetch actual data, using the token
