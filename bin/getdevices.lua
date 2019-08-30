@@ -17,6 +17,9 @@ if not data then
   os.exit(1)
 end
 
+
+--print(require("pl.pretty").write(data))
+
 print("======================================")
 for _, device in ipairs(data.devices) do
   print("Station name  :", device.station_name)
@@ -27,7 +30,7 @@ for _, device in ipairs(data.devices) do
     print("    id            :", NAmodule._id)
     print("    available data:")
     for _, name in ipairs(NAmodule.data_type) do
-      print("        "..extend(name, 12),tostring(NAmodule.dashboard_data[name]))
+      print("        "..extend(name, 12),tostring((NAmodule.dashboard_data or {})[name] or "<no data, check battries?>"))
     end
     print()
   end
