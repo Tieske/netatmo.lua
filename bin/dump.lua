@@ -1,6 +1,7 @@
 package.path = "./?/init.lua;"..package.path
 
 local config = require "config"
+local pretty = require("pl.pretty").write
 local Netatmo = require "netatmo"
 local logging = require "logging"
 Netatmo.log:setLevel(logging.WARN)
@@ -10,7 +11,7 @@ local function extend(str, size)
 end
 
 print()
-print("Netatmo command line utility to display device data and values")
+print("Netatmo command line utility to fetch and dump data")
 print()
 print("Fetching device information from Netatmo servers...")
 local netatmo = Netatmo.new(
@@ -26,21 +27,14 @@ if not data then
   os.exit(1)
 end
 
+print(pretty(data))
 
-print("======================================")
-for _, device in ipairs(data) do
-  print("Station name  :", device.station_name)
-  print("id            :", device._id)
-  print()
-  for _, NAmodule in ipairs(device.modules) do
-    print("    module name   :", NAmodule.module_name)
-    print("    id            :", NAmodule._id)
-    print("    available data:")
-    for _, name in ipairs(NAmodule.data_type) do
-      print("        "..extend(name, 12),tostring((NAmodule.dashboard_data or {})[name] or "<no data, check battries?>"))
-    end
-    print()
-  end
-  print("======================================")
+while true do
+  local _, data = netatmo:get_stations_data()
+  print(("timeserver: %s, device.time_utc: %s, age: %s, last_status_store: %s"):format(
+      data.time_server,
+      data.body.devices[1].dashboard_data.time_utc,
+      data.time_server-data.body.devices[1].dashboard_data.time_utc,
+      data.time_server-data.body.devices[1].last_status_store))
+  require"socket".sleep(30)
 end
-

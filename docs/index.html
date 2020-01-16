@@ -1,0 +1,410 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>Netatmo API</title>
+    <link rel="stylesheet" href="ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>netatmo.lua</h1>
+
+
+<h2>Contents</h2>
+<ul>
+<li><a href="#Generic_functions">Generic functions </a></li>
+<li><a href="#API_specific_functions">API specific functions </a></li>
+</ul>
+
+
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><strong>init</strong></li>
+</ul>
+<h2>Topics</h2>
+<ul class="">
+  <li><a href="topics/readme.md.html">readme</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+<h1>Module <code>init</code></h1>
+<p>Netatmo API library to access the REST api.</p>
+<p> This library implements the session management and makes it easy to access
+ individual endpoints of the API.</p>
+    <h3>Info:</h3>
+    <ul>
+        <li><strong>Copyright</strong>: 2017-2020 Thijs Schreijer</li>
+        <li><strong>Release</strong>: Version x.x, Library to acces the Netatmo API</li>
+        <li><strong>License</strong>: netatmo.lua is free software under the MIT/X11 license.</li>
+        <li><strong>Author</strong>: Thijs Schreijer, http://www.thijsschreijer.nl</li>
+    </ul>
+
+
+<h2><a href="#Generic_functions">Generic functions </a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#netatmo.new">netatmo.new (client_id, client_secret, username, password, scope)</a></td>
+	<td class="summary">Creates a new Netatmo session instance.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#netatmo:login">netatmo:login ()</a></td>
+	<td class="summary">Logs in the current session.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#netatmo:logout">netatmo:logout ()</a></td>
+	<td class="summary">Logs out of the current session.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#netatmo:request">netatmo:request (path, method, headers, query, body)</a></td>
+	<td class="summary">Performs a HTTP request on the Netatmo API.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#netatmo:rewrite_error">netatmo:rewrite_error (expected, ...)</a></td>
+	<td class="summary">Rewrite errors to Lua format (nil+error).</td>
+	</tr>
+</table>
+<h2><a href="#API_specific_functions">API specific functions </a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#netatmo:get_modules_data">netatmo:get_modules_data (device_id, get_favorites)</a></td>
+	<td class="summary">Gets device data, but returns by (sub)module instead of station.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#netatmo:get_stations_data">netatmo:get_stations_data (device_id, get_favorites)</a></td>
+	<td class="summary">Gets device data.</td>
+	</tr>
+</table>
+
+<br/>
+<br/>
+
+
+    <h2 class="section-header has-description"><a name="Generic_functions"></a>Generic functions </h2>
+
+          <div class="section-description">
+           Functions for session management and instantiation
+          </div>
+    <dl class="function">
+    <dt>
+    <a name = "netatmo.new"></a>
+    <strong>netatmo.new (client_id, client_secret, username, password, scope)</strong>
+    </dt>
+    <dd>
+    Creates a new Netatmo session instance.
+ Only OAuth2 <code>grant_type</code> supported is "password".
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">client_id</span>
+         (string) required, the client_id to use for login
+        </li>
+        <li><span class="parameter">client_secret</span>
+         (string) required, the client_secret to use for login
+        </li>
+        <li><span class="parameter">username</span>
+         (string) required, the username to use for login
+        </li>
+        <li><span class="parameter">password</span>
+         (string) required, the password to use for login
+        </li>
+        <li><span class="parameter">scope</span>
+         (string/table) optional, space separated string, or table with strings, containing the scopes requested. Default "read_station".
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        netatmo session object
+    </ol>
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
+<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
+<span class="keyword">local</span> ok, err = nasession:login()
+<span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
+  <span class="global">print</span>(<span class="string">"failed to login: "</span>, err)
+<span class="keyword">end</span></pre>
+    </ul>
+
+</dd>
+    <dt>
+    <a name = "netatmo:login"></a>
+    <strong>netatmo:login ()</strong>
+    </dt>
+    <dd>
+    Logs in the current session.
+ This will automatically be called by the <a href="index.html#netatmo:request">request</a> method, if not logged in
+ already.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code> or <code>nil+err</code>
+    </ol>
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
+<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
+<span class="keyword">local</span> ok, err = nasession:login()
+<span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
+  <span class="global">print</span>(<span class="string">"failed to login: "</span>, err)
+<span class="keyword">end</span></pre>
+    </ul>
+
+</dd>
+    <dt>
+    <a name = "netatmo:logout"></a>
+    <strong>netatmo:logout ()</strong>
+    </dt>
+    <dd>
+    Logs out of the current session.
+ There is no real logout option with this API. Hence this only deletes
+ the locally stored tokens.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code>
+    </ol>
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
+<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
+<span class="keyword">local</span> ok, err = nasession:login()
+<span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
+  <span class="global">print</span>(<span class="string">"failed to login: "</span>, err)
+<span class="keyword">else</span>
+  nasession:logout()
+<span class="keyword">end</span></pre>
+    </ul>
+
+</dd>
+    <dt>
+    <a name = "netatmo:request"></a>
+    <strong>netatmo:request (path, method, headers, query, body)</strong>
+    </dt>
+    <dd>
+    Performs a HTTP request on the Netatmo API.
+ It will automatically inject authentication/session data. Or if not logged
+ logged in yet, it will log in. If the session has expired it will be renewed.</p>
+
+<p> NOTE: if the response_body is json, then it will be decoded and returned as
+ a Lua table.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">path</span>
+         (string) the relative path within the API base path
+        </li>
+        <li><span class="parameter">method</span>
+         (string) HTTP method to use
+        </li>
+        <li><span class="parameter">headers</span>
+         (table) optional header table
+        </li>
+        <li><span class="parameter">query</span>
+         (table) optional query parameters (will be escaped)
+        </li>
+        <li><span class="parameter">body</span>
+         (table/string) optional body. If set the "Content-Length" will be
+ added to the headers. If a table, it will be send as JSON, and the
+ "Content-Type" header will be set to "application/json".
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        ok, response<em>body, response</em>code, response<em>headers, response</em>status_line
+    </ol>
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
+<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
+
+<span class="keyword">local</span> headers = { [<span class="string">"My-Header"</span>] = <span class="string">"myvalue"</span> }
+<span class="keyword">local</span> query = { [<span class="string">"param1"</span>] = <span class="string">"value1"</span> }
+
+<span class="comment">-- the following line will automatically log in
+</span><span class="keyword">local</span> ok, response_body, status, headers, statusline = nasession:request(<span class="string">"/api/attributes"</span>, <span class="string">"GET"</span>, headers, query, <span class="keyword">nil</span>)</pre>
+    </ul>
+
+</dd>
+    <dt>
+    <a name = "netatmo:rewrite_error"></a>
+    <strong>netatmo:rewrite_error (expected, ...)</strong>
+    </dt>
+    <dd>
+    Rewrite errors to Lua format (nil+error).
+ Takes the output of the <a href="index.html#netatmo:request">request</a> function and validates it for errors;</p>
+
+<ul>
+    <li>nil+err</li>
+    <li>body with "error" field (json object)</li>
+    <li>mismatch in expected status code (a 200 expected, but a 404 received)</li>
+</ul>
+
+<p> This reduces the error handling to standard Lua errors, instead of having to
+ validate each of the situations above individually.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">expected</span>
+         (number) optional expected status code, if nil, it will be ignored
+        </li>
+        <li><span class="parameter">...</span>
+         same parameters as the <a href="index.html#netatmo:request">request</a> method
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        nil+err or the input arguments
+    </ol>
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
+<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
+
+<span class="comment">-- Make a request where we expect a 200 result
+</span><span class="keyword">local</span> ok, response_body, status, headers, statusline = nasession:rewrite_error(<span class="number">200</span>, nasession:request(<span class="string">"/some/thing"</span>, <span class="string">"GET"</span>))
+<span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
+  <span class="keyword">return</span> <span class="keyword">nil</span>, response_body <span class="comment">-- a 404 will also follow this path now, since we only want 200's
+</span><span class="keyword">end</span></pre>
+    </ul>
+
+</dd>
+</dl>
+    <h2 class="section-header has-description"><a name="API_specific_functions"></a>API specific functions </h2>
+
+          <div class="section-description">
+           This section contains functions that directly interact with the Netatmo API.
+          </div>
+    <dl class="function">
+    <dt>
+    <a name = "netatmo:get_modules_data"></a>
+    <strong>netatmo:get_modules_data (device_id, get_favorites)</strong>
+    </dt>
+    <dd>
+    Gets device data, but returns by (sub)module instead of station.
+ The returned table is both an array of all modules, as well as a hash-table
+ in which the same modules are indexed by their ID's for easy lookup.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">device_id</span>
+         (string, optional) the id (mac-address) of the station
+        </li>
+        <li><span class="parameter">get_favorites</span>
+         (boolean, optional) set to true to get the favorites
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        module list, or nil+err
+    </ol>
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
+<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
+<span class="keyword">local</span> modules = nasession:get_modules_data()
+<span class="keyword">local</span> <span class="global">module</span> = modules[<span class="string">"03:00:00:04:89:50"</span>]</pre>
+    </ul>
+
+</dd>
+    <dt>
+    <a name = "netatmo:get_stations_data"></a>
+    <strong>netatmo:get_stations_data (device_id, get_favorites)</strong>
+    </dt>
+    <dd>
+    Gets device data.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">device_id</span>
+         (string, optional) the id (mac-address) of the station
+        </li>
+        <li><span class="parameter">get_favorites</span>
+         (boolean, optional) set to true to get the favorites
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        device list + full response, or nil+err
+    </ol>
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
+<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
+<span class="keyword">local</span> stations, full_response = nasession:get_stations_data()</pre>
+    </ul>
+
+</dd>
+</dl>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
+<i style="float:right;">Last updated 2020-01-16 19:59:20 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

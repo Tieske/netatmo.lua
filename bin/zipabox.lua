@@ -1,25 +1,31 @@
 package.path = "./?/init.lua;"..package.path
 
 local config = require "config"
-local netatmo = require "netatmo"
 local sleep = require("socket").sleep
 local https = require "ssl.https"
 local log = require("logging.console")()
+local Netatmo = require "netatmo"
+local logging = require "logging"
+Netatmo.log:setLevel(logging.WARN)
 
 print()
 print("Netatmo command line utility to push data to a url")
 print()
 print("Now entering an endless loop. Checking every "..tostring(config.push_interval).." seconds")
 
+local netatmo = Netatmo.new(
+                  config.auth_data.client_id,
+                  config.auth_data.client_secret,
+                  config.auth_data.username,
+                  config.auth_data.password,
+                  config.auth_data.scope
+                )
+
 -- returns module table from the data
-local function get_module(id, data)
-  id = id:upper()
-  for _, device in ipairs(data.devices or {}) do
-    for _, mod in ipairs(device.modules or {}) do
-      if mod._id:upper() == id then
-        return mod
-      end
-    end
+local function get_module(id, modules)
+  local mod = modules[id]
+  if mod then
+    return mod
   end
   return nil, "module not found with matching id; "..tostring(id)
 end
@@ -40,13 +46,13 @@ while true do
   local success_count = 0
   local fail_count = 0
   local na_count = 0  -- unchanged values
-  local data, err = netatmo.fetch_data(config.auth_data)
-  if not data then
+  local modules, err = netatmo:get_modules_data()
+  if not modules then
     log:warn("Failure to get device list from Netatmo servers: %s",tostring(err))
     fail_count = fail_count + 1
   else
     for _, pushurl in ipairs(config.push_urls) do
-      local mod, err = get_module(pushurl.module_id, data)
+      local mod, err = get_module(pushurl.module_id, modules)
       if not mod then
         log:warn(err)
         fail_count = fail_count + 1
@@ -73,6 +79,8 @@ while true do
       end
     end
   end
-  log:info("pushed %s items succesfully, %s unchanged, %s failures", success_count, na_count, fail_count)
+  if success_count + fail_count > 0 then
+    log:info("pushed %s items succesfully, %s unchanged, %s failures", success_count, na_count, fail_count)
+  end
   sleep(config.push_interval)
 end
