@@ -13,7 +13,7 @@ print("Netatmo command line utility to fetch and dump data")
 print()
 print("Fetching device information from Netatmo servers...")
 local netatmo = Netatmo.new(
-                  config.auth_data.client_id.."x",
+                  config.auth_data.client_id,
                   config.auth_data.client_secret,
                   config.auth_data.username,
                   config.auth_data.password,
