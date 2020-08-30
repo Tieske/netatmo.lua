@@ -20,6 +20,7 @@ dependencies = {
   "lua >= 5.1, < 5.4",
   "luasec",
   "lua-cjson",
+  "lualogging",
 }
 
 build = {
