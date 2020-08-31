@@ -1,8 +1,8 @@
 package = "netatmo"
-version = "scm-1"
+version = "scm-3"
 
 source = {
-  url = "git://github.com/Tieske/netatmo.lua",
+  url = "git://github.com/Tieske/netatmo.lua/", --trailing / to work around luarocks bug with ".lua" extensions
   --tag = "0.1.0",
   branch = "master",
 }
