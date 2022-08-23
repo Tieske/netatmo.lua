@@ -13,8 +13,29 @@ local ltn12 = require "ltn12"
 local json = require "cjson.safe"
 local socket = require "socket"
 
+--- The module table
+-- @table netatmo
+--
+-- @field https
+-- This is a function set on the module table, such that it can
+-- be overridden by another implementation (eg. Copas). The default implementation
+-- uses the LuaSec one (module `ssl.htps`).
+--
+-- @field log
+-- Logger is set on the module table, to be able to override it.
+-- Default is the LuaLogging default logger.
+--
+-- @field DEVICE_TYPES
+-- A lookup table to convert the `type` ID to a description.
+-- Eg. `"NAModule4"` -> `"Additional indoor module"`.
+
 local netatmo = {
   _VERSION = "0.1.0",
+
+  https = require "ssl.https",
+
+  log = require("logging").defaultLogger(),
+
   DEVICE_TYPES = setmetatable({
     NAMain = "Main indoor module",
     NAModule1 = "Outdoor module",
@@ -31,19 +52,11 @@ local netatmo = {
     NACamDoorTag = "Door/window sensor",
   }, {
     __index = function(self, key)
-      error("unknown device type: '"..tostring(key).."'", 2)
+      return tostring(key).."(unknown device type)"
     end
   })
 }
 local netatmo_mt = { __index = netatmo }
-
--- https method is set on the module table, such that it can be overridden
--- by another implementation (eg. Copas)
-netatmo.https = require "ssl.https"
--- Logger is set on the module table, to be able to override it
--- supports: debug, info, warn, error, fatal
--- log:debug([message]|[table]|[format, ...]|[function, ...])
-netatmo.log = require("logging.console")()
 
 
 
@@ -258,14 +271,14 @@ end
 --
 -- NOTE: if the response_body is json, then it will be decoded and returned as
 -- a Lua table.
--- @param path (string) the relative path within the API base path
--- @param method (string) HTTP method to use
--- @param headers (table) optional header table
--- @param query (table) optional query parameters (will be escaped)
--- @param body (table/string) optional body. If set the "Content-Length" will be
+-- @tparam string path the relative path within the API base path
+-- @tparam string method HTTP method to use
+-- @tparam[opt] table headers header table
+-- @tparam[opt] table query query parameters (will be escaped)
+-- @tparam[opt] table|string body if set the "Content-Length" will be
 -- added to the headers. If a table, it will be send as JSON, and the
 -- "Content-Type" header will be set to "application/json".
--- @return ok, response_body, response_code, response_headers, response_status_line
+-- @return `ok`, `response_body`, `response_code`, `response_headers`, `response_status_line`
 -- @usage
 -- local netatmo = require "netatmo"
 -- local nasession = netatmo.new("abcdef", "xyz", "myself@nothere.com", "secret_password")
@@ -304,7 +317,7 @@ end
 --
 -- This reduces the error handling to standard Lua errors, instead of having to
 -- validate each of the situations above individually.
--- @param expected (number) optional expected status code, if nil, it will be ignored
+-- @tparam[opt=nil] number expected expected status code, if nil, it will be ignored
 -- @param ... same parameters as the `request` method
 -- @return nil+err or the input arguments
 -- @usage
@@ -408,9 +421,17 @@ local check_for_warnings do
                         modul.module_name or "no name",
                         modul._id or "no id")
     if modul.reachable == false then
-      netatmo.log:fatal("%s is not reachable", description)
+      netatmo.log:fatal("[netatmo] %s is not reachable", description)
     end
-    --TODO: add more checks? low battery, bad wifi/rf range?
+    if (modul.rf_status or 0) > 90 then -- Current radio status per module. (90=low, 60=highest)
+      netatmo.log:warn("[netatmo] %s has a weak RF signal (%d; 90=low, 60=highest)", description, modul.rf_status)
+    end
+    if (modul.wifi_status or 0) > 86 then -- wifi status per Base station. (86=bad, 56=good)
+      netatmo.log:warn("[netatmo] %s has a weak WIFI signal (%d; 90=low, 60=highest)", description, modul.wifi_status)
+    end
+    if (modul.battery_percent or 999) < 10 then -- wifi status per Base station. (86=bad, 56=good)
+      netatmo.log:warn("[netatmo] %s has a weak battery (%d %%)", description, modul.battery_percent)
+    end
   end
 
   function check_for_warnings(self, devices)
@@ -424,8 +445,9 @@ local check_for_warnings do
 end
 
 --- Gets device data.
--- @param device_id (string, optional) the id (mac-address) of the station
--- @param get_favorites (boolean, optional) set to true to get the favorites
+-- @tparam[opt] string device_id the id (mac-address) of the station
+-- @tparam[opt=false] bool get_favorites set to true to get the favorites
+-- @tparam[opt=false] bool no_warnings set to true to skip generating warnings in the logs
 -- @return device list + full response, or nil+err
 -- @usage
 -- local netatmo = require "netatmo"
@@ -455,16 +477,17 @@ end
 --- Gets device data, but returns by (sub)module instead of station.
 -- The returned table is both an array of all modules, as well as a hash-table
 -- in which the same modules are indexed by their ID's for easy lookup.
--- @param device_id (string, optional) the id (mac-address) of the station
--- @param get_favorites (boolean, optional) set to true to get the favorites
+-- @tparam[opt] string device_id the id (mac-address) of the station
+-- @tparam[opt=false] bool get_favorites set to true to get the favorites
+-- @tparam[opt=false] bool no_warnings set to true to skip generating warnings in the logs
 -- @return module list, or nil+err
 -- @usage
 -- local netatmo = require "netatmo"
 -- local nasession = netatmo.new("abcdef", "xyz", "myself@nothere.com", "secret_password")
 -- local modules = nasession:get_modules_data()
 -- local module = modules["03:00:00:04:89:50"]
-function netatmo:get_modules_data(device_id, get_favorites)
-  local data, err = self:get_stations_data(device_id, get_favorites)
+function netatmo:get_modules_data(device_id, get_favorites, no_warnings)
+  local data, err = self:get_stations_data(device_id, get_favorites, no_warnings)
   if not data then
     return nil, err
   end

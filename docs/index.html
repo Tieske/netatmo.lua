@@ -29,6 +29,7 @@
 
 <h2>Contents</h2>
 <ul>
+<li><a href="#Tables">Tables</a></li>
 <li><a href="#Generic_functions">Generic functions </a></li>
 <li><a href="#API_specific_functions">API specific functions </a></li>
 </ul>
@@ -60,6 +61,13 @@
     </ul>
 
 
+<h2><a href="#Tables">Tables</a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#netatmo">netatmo</a></td>
+	<td class="summary">The module table</td>
+	</tr>
+</table>
 <h2><a href="#Generic_functions">Generic functions </a></h2>
 <table class="function_list">
 	<tr>
@@ -75,22 +83,22 @@
 	<td class="summary">Logs out of the current session.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#netatmo:request">netatmo:request (path, method, headers, query, body)</a></td>
+	<td class="name" nowrap><a href="#netatmo:request">netatmo:request (path, method[, headers[, query[, body]]])</a></td>
 	<td class="summary">Performs a HTTP request on the Netatmo API.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#netatmo:rewrite_error">netatmo:rewrite_error (expected, ...)</a></td>
+	<td class="name" nowrap><a href="#netatmo:rewrite_error">netatmo:rewrite_error ([expected=nil], ...)</a></td>
 	<td class="summary">Rewrite errors to Lua format (nil+error).</td>
 	</tr>
 </table>
 <h2><a href="#API_specific_functions">API specific functions </a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#netatmo:get_modules_data">netatmo:get_modules_data (device_id, get_favorites)</a></td>
+	<td class="name" nowrap><a href="#netatmo:get_modules_data">netatmo:get_modules_data ([device_id[, get_favorites=false[, no_warnings=false]]])</a></td>
 	<td class="summary">Gets device data, but returns by (sub)module instead of station.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#netatmo:get_stations_data">netatmo:get_stations_data (device_id, get_favorites)</a></td>
+	<td class="name" nowrap><a href="#netatmo:get_stations_data">netatmo:get_stations_data ([device_id[, get_favorites=false[, no_warnings=false]]])</a></td>
 	<td class="summary">Gets device data.</td>
 	</tr>
 </table>
@@ -99,6 +107,40 @@
 <br/>
 
 
+    <h2 class="section-header "><a name="Tables"></a>Tables</h2>
+
+    <dl class="function">
+    <dt>
+    <a name = "netatmo"></a>
+    <strong>netatmo</strong>
+    </dt>
+    <dd>
+    The module table
+
+
+    <h3>Fields:</h3>
+    <ul>
+        <li><span class="parameter">https</span>
+         This is a function set on the module table, such that it can
+ be overridden by another implementation (eg. Copas). The default implementation
+ uses the LuaSec one (module <code>ssl.htps</code>).
+        </li>
+        <li><span class="parameter">log</span>
+         Logger is set on the module table, to be able to override it.
+ Default is the LuaLogging default logger.
+        </li>
+        <li><span class="parameter">DEVICE_TYPES</span>
+         A lookup table to convert the <a href="https://www.lua.org/manual/5.1/manual.html#pdf-type">type</a> ID to a description.
+ Eg. <code>&quot;NAModule4&quot;</code> -> <code>&quot;Additional indoor module&quot;</code>.
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
     <h2 class="section-header has-description"><a name="Generic_functions"></a>Generic functions </h2>
 
           <div class="section-description">
@@ -216,7 +258,7 @@
 </dd>
     <dt>
     <a name = "netatmo:request"></a>
-    <strong>netatmo:request (path, method, headers, query, body)</strong>
+    <strong>netatmo:request (path, method[, headers[, query[, body]]])</strong>
     </dt>
     <dd>
     Performs a HTTP request on the Netatmo API.
@@ -230,28 +272,36 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">path</span>
-         (string) the relative path within the API base path
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the relative path within the API base path
         </li>
         <li><span class="parameter">method</span>
-         (string) HTTP method to use
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         HTTP method to use
         </li>
         <li><span class="parameter">headers</span>
-         (table) optional header table
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         header table
+         (<em>optional</em>)
         </li>
         <li><span class="parameter">query</span>
-         (table) optional query parameters (will be escaped)
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a></span>
+         query parameters (will be escaped)
+         (<em>optional</em>)
         </li>
         <li><span class="parameter">body</span>
-         (table/string) optional body. If set the "Content-Length" will be
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.5">table</a> or <a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         if set the "Content-Length" will be
  added to the headers. If a table, it will be send as JSON, and the
  "Content-Type" header will be set to "application/json".
+         (<em>optional</em>)
         </li>
     </ul>
 
     <h3>Returns:</h3>
     <ol>
 
-        ok, response<em>body, response</em>code, response<em>headers, response</em>status_line
+        <code>ok</code>, <code>response_body</code>, <code>response_code</code>, <code>response_headers</code>, <code>response_status_line</code>
     </ol>
 
 
@@ -271,7 +321,7 @@
 </dd>
     <dt>
     <a name = "netatmo:rewrite_error"></a>
-    <strong>netatmo:rewrite_error (expected, ...)</strong>
+    <strong>netatmo:rewrite_error ([expected=nil], ...)</strong>
     </dt>
     <dd>
     Rewrite errors to Lua format (nil+error).
@@ -290,7 +340,9 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">expected</span>
-         (number) optional expected status code, if nil, it will be ignored
+            <span class="types"><span class="type">number</span></span>
+         expected status code, if nil, it will be ignored
+         (<em>default</em> nil)
         </li>
         <li><span class="parameter">...</span>
          same parameters as the <a href="index.html#netatmo:request">request</a> method
@@ -327,7 +379,7 @@
     <dl class="function">
     <dt>
     <a name = "netatmo:get_modules_data"></a>
-    <strong>netatmo:get_modules_data (device_id, get_favorites)</strong>
+    <strong>netatmo:get_modules_data ([device_id[, get_favorites=false[, no_warnings=false]]])</strong>
     </dt>
     <dd>
     Gets device data, but returns by (sub)module instead of station.
@@ -338,10 +390,19 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">device_id</span>
-         (string, optional) the id (mac-address) of the station
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the id (mac-address) of the station
+         (<em>optional</em>)
         </li>
         <li><span class="parameter">get_favorites</span>
-         (boolean, optional) set to true to get the favorites
+            <span class="types"><span class="type">bool</span></span>
+         set to true to get the favorites
+         (<em>default</em> false)
+        </li>
+        <li><span class="parameter">no_warnings</span>
+            <span class="types"><span class="type">bool</span></span>
+         set to true to skip generating warnings in the logs
+         (<em>default</em> false)
         </li>
     </ul>
 
@@ -364,7 +425,7 @@
 </dd>
     <dt>
     <a name = "netatmo:get_stations_data"></a>
-    <strong>netatmo:get_stations_data (device_id, get_favorites)</strong>
+    <strong>netatmo:get_stations_data ([device_id[, get_favorites=false[, no_warnings=false]]])</strong>
     </dt>
     <dd>
     Gets device data.
@@ -373,10 +434,19 @@
     <h3>Parameters:</h3>
     <ul>
         <li><span class="parameter">device_id</span>
-         (string, optional) the id (mac-address) of the station
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the id (mac-address) of the station
+         (<em>optional</em>)
         </li>
         <li><span class="parameter">get_favorites</span>
-         (boolean, optional) set to true to get the favorites
+            <span class="types"><span class="type">bool</span></span>
+         set to true to get the favorites
+         (<em>default</em> false)
+        </li>
+        <li><span class="parameter">no_warnings</span>
+            <span class="types"><span class="type">bool</span></span>
+         set to true to skip generating warnings in the logs
+         (<em>default</em> false)
         </li>
     </ul>
 
@@ -403,7 +473,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
-<i style="float:right;">Last updated 2020-01-16 19:59:20 </i>
+<i style="float:right;">Last updated 2022-08-23 15:46:27 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
