@@ -23,6 +23,7 @@ local netatmo = Netatmo.new(
 local data, err = netatmo:get_stations_data()
 netatmo:logout()
 if not data then
+  print("failed: "..tostring(err))
   os.exit(1)
 end
 
