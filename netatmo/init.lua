@@ -14,7 +14,26 @@ local json = require "cjson.safe"
 local socket = require "socket"
 
 local netatmo = {
-  _VERSION = "0.1.0"
+  _VERSION = "0.1.0",
+  DEVICE_TYPES = setmetatable({
+    NAMain = "Main indoor module",
+    NAModule1 = "Outdoor module",
+    NAModule4 = "Additional indoor module",
+    -- NAunknown? = "Rain gauge",
+    -- NAunknown? = "Anemometer",
+    NAPlug = "Thermostat plug",
+    NATherm1 = "Thermostat",
+    NRV = "Radiator valve",
+    NHC = "Air quality monitor",
+    NACamera = "Indoor camera",
+    NOC = "Outdoor camera",
+    NSD = "Smoke detector",
+    NACamDoorTag = "Door/window sensor",
+  }, {
+    __index = function(self, key)
+      error("unknown device type: '"..tostring(key).."'", 2)
+    end
+  })
 }
 local netatmo_mt = { __index = netatmo }
 
@@ -382,7 +401,27 @@ end
 -- This section contains functions that directly interact with the Netatmo API.
 -- @section API
 
+local check_for_warnings do
+  local function check_module(self, modul)
+    local description = ("%s '%s' (id '%s')"):format(
+                        netatmo.DEVICE_TYPES[modul.type],
+                        modul.module_name or "no name",
+                        modul._id or "no id")
+    if modul.reachable == false then
+      netatmo.log:fatal("%s is not reachable", description)
+    end
+    --TODO: add more checks? low battery, bad wifi/rf range?
+  end
 
+  function check_for_warnings(self, devices)
+    for _, device in ipairs(devices or {}) do
+      check_module(self, device)
+      for _, modul in ipairs(device.modules or {}) do
+        check_module(self, modul)
+      end
+    end
+  end
+end
 
 --- Gets device data.
 -- @param device_id (string, optional) the id (mac-address) of the station
@@ -392,7 +431,7 @@ end
 -- local netatmo = require "netatmo"
 -- local nasession = netatmo.new("abcdef", "xyz", "myself@nothere.com", "secret_password")
 -- local stations, full_response = nasession:get_stations_data()
-function netatmo:get_stations_data(device_id, get_favorites)
+function netatmo:get_stations_data(device_id, get_favorites, no_warnings)
 
   local ok, response_body = self:rewrite_error(200, self:request(
       "/api/getstationsdata",
@@ -402,6 +441,10 @@ function netatmo:get_stations_data(device_id, get_favorites)
       }))
   if not ok then
     return nil, "failed to get data: "..response_body
+  end
+
+  if not no_warnings then
+    check_for_warnings(self, response_body.body.devices)
   end
 
   return response_body.body.devices, response_body
@@ -429,7 +472,7 @@ function netatmo:get_modules_data(device_id, get_favorites)
   for i = 1, #data do
     local device = data[i]
     data[device._id] = device -- also index under its ID
-    for n, submodule in ipairs(device.modules or {}) do
+    for _, submodule in ipairs(device.modules or {}) do
       data[#data + 1] = submodule
       data[submodule._id] = submodule -- also index under its ID
     end
