@@ -1,3 +1,5 @@
+#!/usr/bin/env lua
+
 package.path = "./?/init.lua;"..package.path
 
 local config = require "config"
@@ -17,7 +19,7 @@ local netatmo = Netatmo.new(
                   config.auth_data.password,
                   config.auth_data.scope
                 )
-local data = assert(netatmo:get_stations_data())
+local data = netatmo:get_stations_data()
 netatmo:logout()
 if not data then
   os.exit(1)
