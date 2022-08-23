@@ -427,9 +427,9 @@ local check_for_warnings do
       netatmo.log:warn("[netatmo] %s has a weak RF signal (%d; 90=low, 60=highest)", description, modul.rf_status)
     end
     if (modul.wifi_status or 0) > 86 then -- wifi status per Base station. (86=bad, 56=good)
-      netatmo.log:warn("[netatmo] %s has a weak WIFI signal (%d; 90=low, 60=highest)", description, modul.wifi_status)
+      netatmo.log:warn("[netatmo] %s has a weak WIFI signal (%d; 86=bad, 56=good)", description, modul.wifi_status)
     end
-    if (modul.battery_percent or 999) < 10 then -- wifi status per Base station. (86=bad, 56=good)
+    if (modul.battery_percent or 999) < 10 then
       netatmo.log:warn("[netatmo] %s has a weak battery (%d %%)", description, modul.battery_percent)
     end
   end
