@@ -1,10 +1,16 @@
-package = "netatmo"
-version = "scm-3"
+local package_name = "netatmo"
+local package_version = "scm"
+local rockspec_revision = "3"
+local github_account_name = "Tieske"
+local github_repo_name = package_name..".lua"
+
+package = package_name
+version = package_version.."-"..rockspec_revision
 
 source = {
-  url = "git://github.com/Tieske/netatmo.lua/", --trailing / to work around luarocks bug with ".lua" extensions
-  --tag = "0.1.0",
-  branch = "master",
+  url = "git+https://github.com/"..github_account_name.."/"..github_repo_name.."/",
+  branch = (package_version == "cvs") and "master" or nil,
+  tag = (package_version ~= "cvs") and package_version or nil,
 }
 
 description = {
@@ -12,7 +18,7 @@ description = {
   detailed = [[
     Library to access the Netatmo REST API.
   ]],
-  homepage = "https://github.com/Tieske/netatmo.lua",
+  homepage = "https://github.com/"..github_account_name.."/"..github_repo_name,
   license = "MIT"
 }
 
@@ -29,5 +35,7 @@ build = {
   modules = {
     ["netatmo.init"] = "netatmo/init.lua",
   },
-
+  copy_directories = {
+    "docs",
+ },
 }
