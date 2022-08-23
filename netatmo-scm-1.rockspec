@@ -1,6 +1,6 @@
 local package_name = "netatmo"
 local package_version = "scm"
-local rockspec_revision = "3"
+local rockspec_revision = "1"
 local github_account_name = "Tieske"
 local github_repo_name = package_name..".lua"
 
