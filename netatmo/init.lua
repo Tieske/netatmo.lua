@@ -6,7 +6,7 @@
 -- @author Thijs Schreijer, http://www.thijsschreijer.nl
 -- @license netatmo.lua is free software under the MIT/X11 license.
 -- @copyright 2017-2020 Thijs Schreijer
--- @release Version x.x, Library to acces the Netatmo API
+-- @release Version 0.1.0, Library to acces the Netatmo API
 
 local url = require "socket.url"
 local ltn12 = require "ltn12"
