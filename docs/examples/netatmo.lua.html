@@ -1,0 +1,153 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+<head>
+    <title>Netatmo API</title>
+    <link rel="stylesheet" href="../ldoc.css" type="text/css" />
+</head>
+<body>
+
+<div id="container">
+
+<div id="product">
+	<div id="product_logo"></div>
+	<div id="product_name"><big><b></b></big></div>
+	<div id="product_description"></div>
+</div> <!-- id="product" -->
+
+
+<div id="main">
+
+
+<!-- Menu -->
+
+<div id="navigation">
+<br/>
+<h1>netatmo.lua</h1>
+
+
+
+
+<h2>Examples</h2>
+<ul class="nowrap">
+  <li><a href="../examples/dump.lua.html">dump.lua</a></li>
+  <li><a href="../examples/getdevices.lua.html">getdevices.lua</a></li>
+  <li><strong>netatmo.lua</strong></li>
+</ul>
+<h2>Modules</h2>
+<ul class="nowrap">
+  <li><a href="../index.html">netatmo</a></li>
+</ul>
+<h2>Topics</h2>
+<ul class="">
+  <li><a href="../topics/readme.md.html">readme</a></li>
+</ul>
+
+</div>
+
+<div id="content">
+
+    <h2>netatmo.lua</h2>
+<pre>
+#!/usr/bin/env lua
+<span class="global">package</span>.path = <span class="string">"./?/init.lua;"</span>..<span class="global">package</span>.path
+
+
+<span class="comment">-- Example showing how to use the Netatmo API to fetch data from the Netatmo
+</span><span class="comment">-- servers. This example uses Copas to handle the callback from the Netatmo
+</span><span class="comment">-- servers, and does the full OAuth2 flow.
+</span>
+
+<span class="keyword">local</span> copas = <span class="global">require</span> <span class="string">"copas"</span>
+<span class="keyword">local</span> socket = <span class="global">require</span> <span class="string">"socket"</span>
+<span class="keyword">local</span> pretty = <span class="global">require</span>(<span class="string">"pl.pretty"</span>).write
+<span class="keyword">local</span> Netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
+Netatmo.https = copas.http <span class="comment">-- Let NetAtmo use Copas for https requests
+</span>
+<span class="keyword">local</span> host = <span class="string">"127.0.0.1"</span>
+<span class="keyword">local</span> port = <span class="string">"54321"</span>
+
+copas(<span class="keyword">function</span>()
+  <span class="keyword">local</span> config = <span class="global">require</span> <span class="string">"config"</span> <span class="comment">-- load auth-config
+</span>  <span class="keyword">local</span> na = Netatmo.new {
+    client_id = config.auth_data.client_id,
+    client_secret = config.auth_data.client_secret,
+    callback_url = <span class="string">"http://"</span>..host..<span class="string">":"</span>..port..<span class="string">"/some/path"</span>,
+  }
+  <span class="keyword">local</span> callback_result <span class="comment">-- will get the result once we received it
+</span>
+  <span class="comment">-- set up a server to handle the callback
+</span>  <span class="keyword">local</span> server_sock = <span class="global">assert</span>(socket.bind(host, port))
+  <span class="keyword">local</span> server_ip, server_port = <span class="global">assert</span>(server_sock:getsockname())
+
+  <span class="keyword">local</span> socket_handler = <span class="keyword">function</span>(sock)
+    <span class="comment">-- we assume no http body, so read lines until the line is empty
+</span>    <span class="keyword">local</span> request = {}
+    <span class="keyword">while</span> <span class="keyword">true</span> <span class="keyword">do</span>
+      <span class="keyword">local</span> line = <span class="global">assert</span>(sock:receive(<span class="string">"*l"</span>))
+      <span class="comment">--print(line)
+</span>      <span class="keyword">if</span> line == <span class="string">""</span> <span class="keyword">then</span> <span class="keyword">break</span> <span class="keyword">end</span>
+      request[#request+<span class="number">1</span>] = line
+    <span class="keyword">end</span>
+
+    <span class="comment">-- store callback result and send response
+</span>    callback_result = request
+    sock:send(<span class="string">"HTTP/1.1 200 OK\r\n\r\nOAuth2 access approved, please close this browser window.\r\n"</span>)
+    sock:close()
+
+    <span class="comment">-- remove the server, since we have our request
+</span>    copas.removeserver(server_sock)
+    server_sock = <span class="keyword">nil</span>
+  <span class="keyword">end</span>
+
+  copas.addserver(server_sock, copas.handler(socket_handler))
+
+  <span class="comment">-- instructions for authorization request by user/webbrowser
+</span>  <span class="global">print</span>(<span class="string">"if a webbrowser is not started automatically, please visit: "</span>,na:get_authorization_url())
+  <span class="global">os</span>.execute(<span class="string">"open '"</span>..na:get_authorization_url()..<span class="string">"'"</span>)
+  <span class="global">print</span>()
+  <span class="global">print</span>(<span class="string">"Listening on "</span>..server_ip..<span class="string">":"</span>..server_port)
+
+
+  <span class="comment">-- wait for the callback, or a timeout
+</span>  <span class="keyword">local</span> endtime = socket.gettime()+<span class="number">60</span> <span class="comment">-- wait for 60 seconds max
+</span>  <span class="keyword">while</span> socket.gettime() &lt; endtime <span class="keyword">and</span> callback_result == <span class="keyword">nil</span> <span class="keyword">do</span>
+    copas.sleep(<span class="number">0.1</span>)
+  <span class="keyword">end</span>
+
+  <span class="keyword">if</span> <span class="keyword">not</span> callback_result <span class="keyword">then</span>
+    <span class="comment">-- No results, so we had a timeout, cleanup the server
+</span>    copas.removeserver(server_sock)
+    server_sock = <span class="keyword">nil</span>
+    <span class="global">print</span>(<span class="string">"timeout waiting for callback"</span>)
+    <span class="global">os</span>.exit(<span class="number">1</span>)
+  <span class="keyword">end</span>
+
+  <span class="comment">-- callback_result contains the result of the callback, so we can authorize
+</span>  <span class="comment">-- the client now. We use the first line of the request, the authorize method
+</span>  <span class="comment">-- will parse the state and code from it.
+</span>  <span class="global">assert</span>(na:authorize(callback_result[<span class="number">1</span>]))
+  <span class="global">print</span>(<span class="string">"Authorized successfully!"</span>)
+
+  <span class="comment">-- now we can fetch the data
+</span>  <span class="keyword">local</span> data, err = na:get_stations_data()
+  na:logout()
+  <span class="keyword">if</span> <span class="keyword">not</span> data <span class="keyword">then</span>
+    <span class="global">print</span>(<span class="string">"Error: "</span>, err)
+    <span class="global">os</span>.exit(<span class="number">1</span>)
+  <span class="keyword">end</span>
+
+  <span class="global">print</span>(pretty(data))
+<span class="keyword">end</span>)</pre>
+
+
+</div> <!-- id="content" -->
+</div> <!-- id="main" -->
+<div id="about">
+<i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
+<i style="float:right;">Last updated 2023-10-05 22:52:46 </i>
+</div> <!-- id="about" -->
+</div> <!-- id="container" -->
+</body>
+</html>

@@ -31,7 +31,11 @@ dependencies = {
 
 build = {
   type = "builtin",
-
+  install = {
+    bin = {
+      netatmo = "bin/netatmo.lua",
+    },
+  },
   modules = {
     ["netatmo.init"] = "netatmo/init.lua",
   },

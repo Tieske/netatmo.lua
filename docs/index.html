@@ -31,27 +31,58 @@
 <ul>
 <li><a href="#Tables">Tables</a></li>
 <li><a href="#Generic_functions">Generic functions </a></li>
+<li><a href="#Session_management_functions">Session management functions </a></li>
 <li><a href="#API_specific_functions">API specific functions </a></li>
 </ul>
 
 
 <h2>Modules</h2>
 <ul class="nowrap">
-  <li><strong>init</strong></li>
+  <li><strong>netatmo</strong></li>
 </ul>
 <h2>Topics</h2>
 <ul class="">
   <li><a href="topics/readme.md.html">readme</a></li>
+</ul>
+<h2>Examples</h2>
+<ul class="nowrap">
+  <li><a href="examples/dump.lua.html">dump.lua</a></li>
+  <li><a href="examples/getdevices.lua.html">getdevices.lua</a></li>
+  <li><a href="examples/netatmo.lua.html">netatmo.lua</a></li>
 </ul>
 
 </div>
 
 <div id="content">
 
-<h1>Module <code>init</code></h1>
+<h1>Module <code>netatmo</code></h1>
 <p>Netatmo API library to access the REST api.</p>
 <p> This library implements the session management and makes it easy to access
  individual endpoints of the API.</p>
+
+<p> To create a valid session, access and refresh tokens are required.
+ This requires the user to login to the NetAtmo site and authorize the application.
+ The  library doesn't provide a full flow, but does provide the necessary functions
+ to obtain the required tokens.</p>
+
+<p> The <a href="index.html#get_authorization_url">get_authorization_url</a> method will return the url to navigate to to start the
+ OAuth2 flow. Once authorized on the NetAtmo site, it will redirect the users webbrowser
+ to the <code>callback_url</code> provided when creating the session. This url should be handled
+ by a webserver, and the <a href="index.html#authorize">authorize</a> method should be called with the results from the callback url.</p>
+
+<p> To manually obtain the tokens, without a webserver, use a callback_url that is certain to fail
+ (the default will probably do). Then get the url using <a href="index.html#get_authorization_url">get_authorization_url</a>
+ and instruct the user to visit that url and authorize the application. Once authorized,
+ the user will be redirected to the <code>callback_url</code> provided when creating the session.
+ Since it is a bad URL the redirect will fail with an error in the browser.
+ Instruct the user to collect the required informatiuon ("state" and "code" parameters) from the
+ url-bar in the browser and use them to call the <a href="index.html#authorize">authorize</a> method.</p>
+
+<p> If you manually retrieved a refresh token, then it can be set by calling <a href="index.html#set_refresh_token">set_refresh_token</a>.</p>
+
+<p> The session can be kept alive using the <a href="index.html#keepalive">keepalive</a> method. At the time of writing access tokens
+ have a validity of 10800 seconds (3 hours). Internally a clock-skew of 5 minutes is used, so
+ the library considers the token to be expired 5 minutes before the actual expiration time.</p>
     <h3>Info:</h3>
     <ul>
         <li><strong>Copyright</strong>: 2017-2020 Thijs Schreijer</li>
@@ -71,34 +102,61 @@
 <h2><a href="#Generic_functions">Generic functions </a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#netatmo.new">netatmo.new (client_id, client_secret, username, password, scope)</a></td>
+	<td class="name" nowrap><a href="#new">new (options)</a></td>
 	<td class="summary">Creates a new Netatmo session instance.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#netatmo:login">netatmo:login ()</a></td>
-	<td class="summary">Logs in the current session.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#netatmo:logout">netatmo:logout ()</a></td>
-	<td class="summary">Logs out of the current session.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#netatmo:request">netatmo:request (path, method[, headers[, query[, body]]])</a></td>
+	<td class="name" nowrap><a href="#request">request (path, method[, headers[, query[, body]]])</a></td>
 	<td class="summary">Performs a HTTP request on the Netatmo API.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#netatmo:rewrite_error">netatmo:rewrite_error ([expected=nil], ...)</a></td>
+	<td class="name" nowrap><a href="#rewrite_error">rewrite_error ([expected=nil], ...)</a></td>
 	<td class="summary">Rewrite errors to Lua format (nil+error).</td>
+	</tr>
+</table>
+<h2><a href="#Session_management_functions">Session management functions </a></h2>
+<table class="function_list">
+	<tr>
+	<td class="name" nowrap><a href="#authorize">authorize (state[, code])</a></td>
+	<td class="summary">Authorizes the session.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#expires_in">expires_in ()</a></td>
+	<td class="summary">Gets the remaining time in seconds before the access token expires.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#get_authorization_url">get_authorization_url ()</a></td>
+	<td class="summary">Gets the authorization url for the user to navigate to to start the OAuth2 flow.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#keepalive">keepalive ([delay_on_error=60])</a></td>
+	<td class="summary">Keeps the session alive.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#login">login ()</a></td>
+	<td class="summary">Logs in the current session (deprecated).</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#logout">logout ()</a></td>
+	<td class="summary">Logs out of the current session.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#refresh">refresh ()</a></td>
+	<td class="summary">Will refresh the access token.</td>
+	</tr>
+	<tr>
+	<td class="name" nowrap><a href="#set_refresh_token">set_refresh_token (refresh_token)</a></td>
+	<td class="summary">Sets the refresh token to use for the session.</td>
 	</tr>
 </table>
 <h2><a href="#API_specific_functions">API specific functions </a></h2>
 <table class="function_list">
 	<tr>
-	<td class="name" nowrap><a href="#netatmo:get_modules_data">netatmo:get_modules_data ([device_id[, get_favorites=false[, no_warnings=false]]])</a></td>
+	<td class="name" nowrap><a href="#get_modules_data">get_modules_data ([device_id[, get_favorites=false[, no_warnings=false]]])</a></td>
 	<td class="summary">Gets device data, but returns by (sub)module instead of station.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#netatmo:get_stations_data">netatmo:get_stations_data ([device_id[, get_favorites=false[, no_warnings=false]]])</a></td>
+	<td class="name" nowrap><a href="#get_stations_data">get_stations_data ([device_id[, get_favorites=false[, no_warnings=false]]])</a></td>
 	<td class="summary">Gets device data.</td>
 	</tr>
 </table>
@@ -148,31 +206,52 @@
           </div>
     <dl class="function">
     <dt>
-    <a name = "netatmo.new"></a>
-    <strong>netatmo.new (client_id, client_secret, username, password, scope)</strong>
+    <a name = "new"></a>
+    <strong>new (options)</strong>
     </dt>
     <dd>
     Creates a new Netatmo session instance.
- Only OAuth2 <code>grant_type</code> supported is "password".
+ Only OAuth2 <code>grant_type</code> supported is "authorization_code", for which the refresh-token is required.
+ The <code>refresh_token</code> can be specified in the options table, or set later using the <a href="index.html#set_refresh_token">set_refresh_token</a> method.
+ The token can also be retreived by getting the callback url from <a href="index.html#get_authorization_url">get_authorization_url</a> and after calling
+ it, pass on the results to the <a href="index.html#authorize">authorize</a> method.
 
 
     <h3>Parameters:</h3>
     <ul>
+        <li><span class="parameter">options</span> options table with the following options
+        <ul>
         <li><span class="parameter">client_id</span>
-         (string) required, the client_id to use for login
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the client_id to use for accessing the API
         </li>
         <li><span class="parameter">client_secret</span>
-         (string) required, the client_secret to use for login
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the client_secret to use for accessing the API
         </li>
-        <li><span class="parameter">username</span>
-         (string) required, the username to use for login
-        </li>
-        <li><span class="parameter">password</span>
-         (string) required, the password to use for login
+        <li><span class="parameter">refresh_token</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the user provided refresh-token to use for accessing the API
+         (<em>optional</em>)
         </li>
         <li><span class="parameter">scope</span>
-         (string/table) optional, space separated string, or table with strings, containing the scopes requested. Default "read_station".
+            <span class="types"><span class="type">array</span></span>
+         the scope(s) to use for accessing the API. Defaults to all read permissions.
+         (<em>optional</em>)
         </li>
+        <li><span class="parameter">persist</span>
+            <span class="types"><span class="type">function</span></span>
+         callback function called as <code>function(session, refresh_token)</code> whenever
+ the refresh token is updated. This can be used to store the refresh token across restarts. NOTE: the refresh_token
+ can be nil, in case of a logout.
+         (<em>optional</em>)
+        </li>
+        <li><span class="parameter">callback_url</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the OAuth2 callback url
+         (<em>default</em> "https://localhost:54321")
+        </li>
+        </li></ul>
     </ul>
 
     <h3>Returns:</h3>
@@ -186,84 +265,36 @@
     <h3>Usage:</h3>
     <ul>
         <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
-<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
-<span class="keyword">local</span> ok, err = nasession:login()
-<span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
-  <span class="global">print</span>(<span class="string">"failed to login: "</span>, err)
-<span class="keyword">end</span></pre>
+<span class="keyword">local</span> nasession = netatmo.new {
+   client_id = <span class="string">"abcdef"</span>,
+   client_secret = <span class="string">"xyz"</span>,
+   refresh_token = <span class="string">"123"</span>,
+   scope = { <span class="string">"read_station"</span>, <span class="string">"read_thermostat"</span> },
+   callback_url = <span class="string">"https://localhost:54321/"</span>,
+   persist = <span class="keyword">function</span>(session, refresh_token) ... <span class="keyword">end</span>,
+}
+
+<span class="comment">-- alternatively:
+</span><span class="keyword">local</span> nasession = netatmo.new {
+   client_id = <span class="string">"abcdef"</span>,
+   client_secret = <span class="string">"xyz"</span>,
+   scope = { <span class="string">"read_station"</span>, <span class="string">"read_thermostat"</span> },
+   callback_url = <span class="string">"https://localhost:54321/"</span>,  <span class="comment">--&gt; callback called with 'state' and 'code' parameters
+</span>}
+user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have user navigate to this url and authorize
+</span><span class="comment">-- now authorize using the 'state' and 'code' parameters
+</span><span class="global">assert</span>(nasession:authorize(state, code))</pre>
     </ul>
 
 </dd>
     <dt>
-    <a name = "netatmo:login"></a>
-    <strong>netatmo:login ()</strong>
-    </dt>
-    <dd>
-    Logs in the current session.
- This will automatically be called by the <a href="index.html#netatmo:request">request</a> method, if not logged in
- already.
-
-
-
-    <h3>Returns:</h3>
-    <ol>
-
-        <code>true</code> or <code>nil+err</code>
-    </ol>
-
-
-
-    <h3>Usage:</h3>
-    <ul>
-        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
-<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
-<span class="keyword">local</span> ok, err = nasession:login()
-<span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
-  <span class="global">print</span>(<span class="string">"failed to login: "</span>, err)
-<span class="keyword">end</span></pre>
-    </ul>
-
-</dd>
-    <dt>
-    <a name = "netatmo:logout"></a>
-    <strong>netatmo:logout ()</strong>
-    </dt>
-    <dd>
-    Logs out of the current session.
- There is no real logout option with this API. Hence this only deletes
- the locally stored tokens.
-
-
-
-    <h3>Returns:</h3>
-    <ol>
-
-        <code>true</code>
-    </ol>
-
-
-
-    <h3>Usage:</h3>
-    <ul>
-        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
-<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
-<span class="keyword">local</span> ok, err = nasession:login()
-<span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
-  <span class="global">print</span>(<span class="string">"failed to login: "</span>, err)
-<span class="keyword">else</span>
-  nasession:logout()
-<span class="keyword">end</span></pre>
-    </ul>
-
-</dd>
-    <dt>
-    <a name = "netatmo:request"></a>
-    <strong>netatmo:request (path, method[, headers[, query[, body]]])</strong>
+    <a name = "request"></a>
+    <strong>request (path, method[, headers[, query[, body]]])</strong>
     </dt>
     <dd>
     Performs a HTTP request on the Netatmo API.
- It will automatically inject authentication/session data. Or if not logged
- logged in yet, it will log in. If the session has expired it will be renewed.</p>
+ It will automatically inject authentication/session data. If the session has
+ expired it will be renewed.</p>
 
 <p> NOTE: if the response_body is json, then it will be decoded and returned as
  a Lua table.
@@ -309,23 +340,28 @@
     <h3>Usage:</h3>
     <ul>
         <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
-<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
+<span class="keyword">local</span> nasession = netatmo.new {
+   client_id = <span class="string">"abcdef"</span>,
+   client_secret = <span class="string">"xyz"</span>,
+   refresh_token = <span class="string">"123"</span>,
+   scope = { <span class="string">"read_station"</span>, <span class="string">"read_thermostat"</span> },
+   callback_url = <span class="string">"https://localhost:54321/"</span>,
+}
 
 <span class="keyword">local</span> headers = { [<span class="string">"My-Header"</span>] = <span class="string">"myvalue"</span> }
 <span class="keyword">local</span> query = { [<span class="string">"param1"</span>] = <span class="string">"value1"</span> }
 
-<span class="comment">-- the following line will automatically log in
-</span><span class="keyword">local</span> ok, response_body, status, headers, statusline = nasession:request(<span class="string">"/api/attributes"</span>, <span class="string">"GET"</span>, headers, query, <span class="keyword">nil</span>)</pre>
+<span class="keyword">local</span> ok, response_body, status, headers, statusline = nasession:request(<span class="string">"/api/attributes"</span>, <span class="string">"GET"</span>, headers, query, <span class="keyword">nil</span>)</pre>
     </ul>
 
 </dd>
     <dt>
-    <a name = "netatmo:rewrite_error"></a>
-    <strong>netatmo:rewrite_error ([expected=nil], ...)</strong>
+    <a name = "rewrite_error"></a>
+    <strong>rewrite_error ([expected=nil], ...)</strong>
     </dt>
     <dd>
     Rewrite errors to Lua format (nil+error).
- Takes the output of the <a href="index.html#netatmo:request">request</a> function and validates it for errors;</p>
+ Takes the output of the <a href="index.html#request">request</a> function and validates it for errors;</p>
 
 <ul>
     <li>nil+err</li>
@@ -345,7 +381,7 @@
          (<em>default</em> nil)
         </li>
         <li><span class="parameter">...</span>
-         same parameters as the <a href="index.html#netatmo:request">request</a> method
+         same parameters as the <a href="index.html#request">request</a> method
         </li>
     </ul>
 
@@ -360,7 +396,13 @@
     <h3>Usage:</h3>
     <ul>
         <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
-<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
+<span class="keyword">local</span> nasession = netatmo.new {
+   client_id = <span class="string">"abcdef"</span>,
+   client_secret = <span class="string">"xyz"</span>,
+   refresh_token = <span class="string">"123"</span>,
+   scope = { <span class="string">"read_station"</span>, <span class="string">"read_thermostat"</span> },
+   callback_url = <span class="string">"https://localhost:54321/"</span>,
+}
 
 <span class="comment">-- Make a request where we expect a 200 result
 </span><span class="keyword">local</span> ok, response_body, status, headers, statusline = nasession:rewrite_error(<span class="number">200</span>, nasession:request(<span class="string">"/some/thing"</span>, <span class="string">"GET"</span>))
@@ -371,6 +413,234 @@
 
 </dd>
 </dl>
+    <h2 class="section-header has-description"><a name="Session_management_functions"></a>Session management functions </h2>
+
+          <div class="section-description">
+           Functions for OAuth2 session management.
+          </div>
+    <dl class="function">
+    <dt>
+    <a name = "authorize"></a>
+    <strong>authorize (state[, code])</strong>
+    </dt>
+    <dd>
+    Authorizes the session.
+ This method is called from the callback url, and should be provided with the
+ <code>state</code> and <code>code</code> values from the callback url. It will fetch the initial tokens,
+ resulting in an access and refresh token if successful.
+ It can also be called with a single argument which is then the request(line) from
+ the callback url. It will then extract the <code>state</code> and <code>code</code> values from the url.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">state</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the state value from the callback url, or the callback request, request-url including query args, or the first request line.
+        </li>
+        <li><span class="parameter">code</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the code value from the callback url (required if <code>state</code> is not request-data)
+         (<em>optional</em>)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code> or nil+err
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "expires_in"></a>
+    <strong>expires_in ()</strong>
+    </dt>
+    <dd>
+    Gets the remaining time in seconds before the access token expires.
+ Returns an error if no refresh token is available.
+ The returned value can be negative. When the result of this function is
+ negative, then the <a href="index.html#refresh">refresh</a> method should be called to refresh the token.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        number of seconds remaining, or nil+err
+    </ol>
+
+
+    <h3>See also:</h3>
+    <ul>
+         <li><a href="index.html#refresh">refresh</a></li>
+         <li><a href="index.html#keepalive">keepalive</a></li>
+    </ul>
+
+
+</dd>
+    <dt>
+    <a name = "get_authorization_url"></a>
+    <strong>get_authorization_url ()</strong>
+    </dt>
+    <dd>
+    Gets the authorization url for the user to navigate to to start the OAuth2 flow.
+ The resulting "code" and "state" values from the callback url can be used
+ to call the <a href="index.html#authorize">authorize</a> method.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+           <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+        the url to navigate to
+    </ol>
+
+
+
+
+</dd>
+    <dt>
+    <a name = "keepalive"></a>
+    <strong>keepalive ([delay_on_error=60])</strong>
+    </dt>
+    <dd>
+    Keeps the session alive.
+ Wraps around <a href="index.html#expires_in">expires_in</a> and <a href="index.html#refresh">refresh</a> to keep the session alive.
+ Call this function in a loop, delaying each time by the returned number of seconds.
+ It will only refresh the token if required (other calls can also refresh the
+ token making an explicit refresh unnecessary).
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">delay_on_error</span>
+            <span class="types"><span class="type">number</span></span>
+         the number of seconds to delay when an error occurs (to prevent a busy loop).
+         (<em>default</em> 60)
+        </li>
+    </ul>
+
+    <h3>Returns:</h3>
+    <ol>
+
+        number of seconds to delay until the next call, or <code>delay_on_error+err</code>
+    </ol>
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="keyword">local</span> keepalive_thread = create_thread(<span class="keyword">function</span>()
+  <span class="keyword">while</span> <span class="keyword">true</span> <span class="keyword">do</span>
+    <span class="keyword">local</span> delay, err = nasession:keepalive()
+    sleep(delay)
+  <span class="keyword">end</span>
+<span class="keyword">end</span>)</pre>
+    </ul>
+
+</dd>
+    <dt>
+    <a name = "login"></a>
+    <strong>login ()</strong>
+    </dt>
+    <dd>
+    Logs in the current session (deprecated).
+ Since the NetAtmo API no longer allows to log in using a password, this method
+ will no longer work. It will always return an error that a new <code>refresh_token</code>
+ must be set.
+
+
+
+
+
+
+
+</dd>
+    <dt>
+    <a name = "logout"></a>
+    <strong>logout ()</strong>
+    </dt>
+    <dd>
+    Logs out of the current session.
+ There is no real logout option with this API. Hence this only deletes
+ the locally stored tokens. This will make any new calls fail, until a new
+ refresh token has been set.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code>
+    </ol>
+
+
+
+    <h3>Usage:</h3>
+    <ul>
+        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
+<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
+<span class="keyword">local</span> ok, err = nasession:login()
+<span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
+  <span class="global">print</span>(<span class="string">"failed to login: "</span>, err)
+<span class="keyword">else</span>
+  nasession:logout()
+<span class="keyword">end</span></pre>
+    </ul>
+
+</dd>
+    <dt>
+    <a name = "refresh"></a>
+    <strong>refresh ()</strong>
+    </dt>
+    <dd>
+    Will refresh the access token.
+ This will force a refresh of the access token, even if it is still valid.
+
+
+
+    <h3>Returns:</h3>
+    <ol>
+
+        <code>true</code> or nil+err
+    </ol>
+
+
+    <h3>See also:</h3>
+    <ul>
+         <li><a href="index.html#expires_in">expires_in</a></li>
+         <li><a href="index.html#keepalive">keepalive</a></li>
+    </ul>
+
+
+</dd>
+    <dt>
+    <a name = "set_refresh_token"></a>
+    <strong>set_refresh_token (refresh_token)</strong>
+    </dt>
+    <dd>
+    Sets the refresh token to use for the session.
+
+
+    <h3>Parameters:</h3>
+    <ul>
+        <li><span class="parameter">refresh_token</span>
+            <span class="types"><a class="type" href="https://www.lua.org/manual/5.1/manual.html#5.4">string</a></span>
+         the refresh token to use
+        </li>
+    </ul>
+
+
+
+
+
+</dd>
+</dl>
     <h2 class="section-header has-description"><a name="API_specific_functions"></a>API specific functions </h2>
 
           <div class="section-description">
@@ -378,8 +648,8 @@
           </div>
     <dl class="function">
     <dt>
-    <a name = "netatmo:get_modules_data"></a>
-    <strong>netatmo:get_modules_data ([device_id[, get_favorites=false[, no_warnings=false]]])</strong>
+    <a name = "get_modules_data"></a>
+    <strong>get_modules_data ([device_id[, get_favorites=false[, no_warnings=false]]])</strong>
     </dt>
     <dd>
     Gets device data, but returns by (sub)module instead of station.
@@ -424,8 +694,8 @@
 
 </dd>
     <dt>
-    <a name = "netatmo:get_stations_data"></a>
-    <strong>netatmo:get_stations_data ([device_id[, get_favorites=false[, no_warnings=false]]])</strong>
+    <a name = "get_stations_data"></a>
+    <strong>get_stations_data ([device_id[, get_favorites=false[, no_warnings=false]]])</strong>
     </dt>
     <dd>
     Gets device data.
@@ -473,7 +743,7 @@
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
-<i style="float:right;">Last updated 2022-10-22 12:00:16 </i>
+<i style="float:right;">Last updated 2023-10-05 22:52:46 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
