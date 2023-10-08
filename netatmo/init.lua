@@ -203,30 +203,31 @@ local function get_access_token(self)
 
   if not self.refresh_token then
     -- there is no refresh token, so we must login first
-    local ok, err = self:login()
-    if not ok then
-      return nil, err
-    end
-    return self.access_token
+    self:login_callback()
+    return nil, "login required"
   end
 
   -- make a refresh call
   netatmo.log:debug("[netatmo] refreshing access_token for %s", self.state)
-  local ok, response_body = self:rewrite_error(200,
+  local ok, response_body, response_code, response_headers, response_status_line =
     na_request("/oauth2/token", "POST", nil, nil, {
-      -- docs say urlencoded body, we're trying JSON anyway
-      grant_type = "refresh_token",
-      refresh_token = self.refresh_token,
-      client_id = self.client_id,
-      client_secret = self.client_secret,
-    })
-  )
-  if not ok then
-    -- refresh failed, expired refresh token? do a force logout and retry
-    -- which forces a new login
-    netatmo.log:error("[netatmo] failed to refresh the access_token, retrying. Error: %s", response_body)
+    -- docs say urlencoded body, we're trying JSON anyway
+    grant_type = "refresh_token",
+    refresh_token = self.refresh_token,
+    client_id = self.client_id,
+    client_secret = self.client_secret,
+  })
+
+  if response_code == 401 or response_code == 403 then
+    -- auth failure, refresh-token invalid, clear it
     self:logout()
-    return get_access_token(self)
+    return get_access_token(self) -- retry, to return the above error "login required"
+  end
+
+  ok, response_body = self:rewrite_error(200, ok, response_body, response_code, response_headers, response_status_line)
+  if not ok then
+    netatmo.log:error("[netatmo] failed to refresh the access_token. Error: %s", response_body)
+    return nil, response_body
   end
 
   -- refresh success!
@@ -254,30 +255,33 @@ end
 -- @tparam[opt] function options.persist callback function called as `function(session, refresh_token)` whenever
 -- the refresh token is updated. This can be used to store the refresh token across restarts. NOTE: the refresh_token
 -- can be nil, in case of a logout.
+-- @tparam[opt] function options.login callback function called as `function(session)` whenever a login is required
+-- (using the refresh-token to get a new access token returned a 401 or 403). If the refresh is tried implicitly
+-- when a call is made to the API, then the login callback will be called before the API call returns an error.
 -- @tparam[opt="https://localhost:54321"] string options.callback_url the OAuth2 callback url
 -- @return netatmo session object
 -- @usage
 -- local netatmo = require "netatmo"
--- local nasession = netatmo.new {
---    client_id = "abcdef",
---    client_secret = "xyz",
---    refresh_token = "123",
---    scope = { "read_station", "read_thermostat" },
---    callback_url = "https://localhost:54321/",
---    persist = function(session, refresh_token) ... end,
--- }
 --
--- -- alternatively:
+-- local must_login = false
 -- local nasession = netatmo.new {
 --    client_id = "abcdef",
 --    client_secret = "xyz",
 --    scope = { "read_station", "read_thermostat" },
 --    callback_url = "https://localhost:54321/",  --> callback called with 'state' and 'code' parameters
+--    login = function(session) must_login = true end,
 -- }
 -- user_url = nasession:get_authorization_url()   --> have user navigate to this url and authorize
 -- -- now authorize using the 'state' and 'code' parameters
 -- assert(nasession:authorize(state, code))
-
+--
+-- local data, err = nasession:get_modules_data()
+-- if not data
+--   if must_login then
+--     -- tell user to login again, tokens expired for some reason
+--   end
+--   -- handle error
+-- end
 function netatmo.new(options)
   assert(type(options)=="table", "expected an options table")
   local self = {
@@ -304,9 +308,14 @@ function netatmo.new(options)
   end
 
   if options.persist ~= nil then
-    assert(type(options.persist)=="function", "'options.persist' must be a function")
+    assert(type(options.persist) == "function", "'options.persist' must be a function")
   end
   self.persist_callback = options.persist or function() end
+
+  if options.login ~= nil then
+    assert(type(options.login) == "function", "'options.login' must be a function")
+  end
+  self.login_callback = options.login or function() end
 
   netatmo.log:debug("[netatmo] created new session %s", self.state)
   return self
@@ -371,6 +380,8 @@ end
 --
 -- This reduces the error handling to standard Lua errors, instead of having to
 -- validate each of the situations above individually.
+--
+-- If the status code is a 401 or 403, then the access token will be cleared.
 -- @tparam[opt=nil] number expected expected status code, if nil, it will be ignored
 -- @param ... same parameters as the `request` method
 -- @return nil+err or the input arguments
@@ -392,6 +403,12 @@ end
 function netatmo:rewrite_error(expected, ok, body, status, headers, ...)
   if not ok then
     return ok, body
+  end
+
+  if status == 401 or status == 403 then
+    -- Auth error, clear our access token
+    self.access_token = nil
+    self.access_token_expires = nil
   end
 
   if type(body) == "table" and type(body.error) == "table" then
