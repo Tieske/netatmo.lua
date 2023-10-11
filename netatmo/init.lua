@@ -26,9 +26,9 @@
 -- The session can be kept alive using the `keepalive` method. At the time of writing access tokens
 -- have a validity of 10800 seconds (3 hours). Internally a clock-skew of 5 minutes is used, so
 -- the library considers the token to be expired 5 minutes before the actual expiration time.
--- @author Thijs Schreijer, http://www.thijsschreijer.nl
+-- @author Thijs Schreijer, https://www.thijsschreijer.nl
 -- @license netatmo.lua is free software under the MIT/X11 license.
--- @copyright 2017-2020 Thijs Schreijer
+-- @copyright 2017-2023 Thijs Schreijer
 -- @release Version 0.1.0, Library to acces the Netatmo API
 -- @module netatmo
 
@@ -37,7 +37,7 @@ local ltn12 = require "ltn12"
 local json = require "cjson.safe"
 local socket = require "socket"
 
---- The module table
+--- The module table containing some global settings and constants.
 -- @table netatmo
 --
 -- @field https
@@ -52,9 +52,21 @@ local socket = require "socket"
 -- @field DEVICE_TYPES
 -- A lookup table to convert the `type` ID to a description.
 -- Eg. `"NAModule4"` -> `"Additional indoor module"`.
+--
+-- @field ERR_MUST_AUTHORIZE
+-- Error message returned when a call is made without a valid session. This indicates
+-- the user must login (again) to authorize the application. See also `authorized`.
+--
+-- @field ERR_REFRESH_IN_PROGRESS
+-- Error message returned when a refresh is (possibly implict) attempted, but another
+-- refresh is already in progress. This is to prevent multiple refreshes from happening
+-- simultaneously. When this happens retry shortly after.
+
 
 local netatmo = {
   _VERSION = "0.1.0",
+  ERR_MUST_AUTHORIZE = "not logged in, must authorize first",
+  ERR_REFRESH_IN_PROGRESS = "refresh is in progress, try again shortly",
 
   https = require "ssl.https",
 
@@ -177,6 +189,8 @@ end
 
 
 
+-- sets the access token and its expiry time.
+-- pass in "nil" to clear the token
 local function set_access_token(self, access_token, expires_in)
   if access_token then
     self.access_token = "Bearer " .. access_token
@@ -203,11 +217,15 @@ local function get_access_token(self)
 
   if not self.refresh_token then
     -- there is no refresh token, so we must login first
-    self:login_callback()
-    return nil, "login required"
+    return self:authorized() -- returns the error
   end
 
   -- make a refresh call
+  local ok, err = self:refresh_start()
+  if not ok then
+    return nil, err
+  end
+
   netatmo.log:debug("[netatmo] refreshing access_token for %s", self.state)
   local ok, response_body, response_code, response_headers, response_status_line =
     na_request("/oauth2/token", "POST", nil, nil, {
@@ -218,10 +236,12 @@ local function get_access_token(self)
     client_secret = self.client_secret,
   })
 
-  if response_code == 401 or response_code == 403 then
+  self:refresh_end()
+
+  if response_code == 401 or response_code == 403 or response_code == 400 then
     -- auth failure, refresh-token invalid, clear it
     self:logout()
-    return get_access_token(self) -- retry, to return the above error "login required"
+    return self:authorized() -- returns the error that user must login
   end
 
   ok, response_body = self:rewrite_error(200, ok, response_body, response_code, response_headers, response_status_line)
@@ -255,9 +275,6 @@ end
 -- @tparam[opt] function options.persist callback function called as `function(session, refresh_token)` whenever
 -- the refresh token is updated. This can be used to store the refresh token across restarts. NOTE: the refresh_token
 -- can be nil, in case of a logout.
--- @tparam[opt] function options.login callback function called as `function(session)` whenever a login is required
--- (using the refresh-token to get a new access token returned a 401 or 403). If the refresh is tried implicitly
--- when a call is made to the API, then the login callback will be called before the API call returns an error.
 -- @tparam[opt="https://localhost:54321"] string options.callback_url the OAuth2 callback url
 -- @return netatmo session object
 -- @usage
@@ -269,7 +286,6 @@ end
 --    client_secret = "xyz",
 --    scope = { "read_station", "read_thermostat" },
 --    callback_url = "https://localhost:54321/",  --> callback called with 'state' and 'code' parameters
---    login = function(session) must_login = true end,
 -- }
 -- user_url = nasession:get_authorization_url()   --> have user navigate to this url and authorize
 -- -- now authorize using the 'state' and 'code' parameters
@@ -277,7 +293,7 @@ end
 --
 -- local data, err = nasession:get_modules_data()
 -- if not data
---   if must_login then
+--   if err == netatmo.ERR_MUST_AUTHORIZE then
 --     -- tell user to login again, tokens expired for some reason
 --   end
 --   -- handle error
@@ -288,6 +304,7 @@ function netatmo.new(options)
     client_id = assert(options.client_id, "'options.client_id' is missing"),
     client_secret = assert(options.client_secret, "'options.client_secret' is missing"),
     callback_url = options.callback_url or "https://localhost:54321",
+    refreshing = false,
   }
   setmetatable(self, netatmo_mt)
 
@@ -303,20 +320,15 @@ function netatmo.new(options)
     "read_smokedetector",
   }
   self.state = "netatmo-session-"..tostring(math.fmod(math.floor(socket.gettime()*1000), 10000))
-  if options.refresh_token then
-    self:set_refresh_token(options.refresh_token)
-  end
 
   if options.persist ~= nil then
     assert(type(options.persist) == "function", "'options.persist' must be a function")
   end
   self.persist_callback = options.persist or function() end
 
-  if options.login ~= nil then
-    assert(type(options.login) == "function", "'options.login' must be a function")
+  if options.refresh_token then
+    self:set_refresh_token(options.refresh_token)
   end
-  self.login_callback = options.login or function() end
-
   netatmo.log:debug("[netatmo] created new session %s", self.state)
   return self
 end
@@ -336,7 +348,8 @@ end
 -- @tparam[opt] table|string body if set the "Content-Length" will be
 -- added to the headers. If a table, it will be send as JSON, and the
 -- "Content-Type" header will be set to "application/json".
--- @return `ok`, `response_body`, `response_code`, `response_headers`, `response_status_line`
+-- @return `ok`, `response_body`, `response_code`, `response_headers`, `response_status_line` or
+-- `nil + err`
 -- @usage
 -- local netatmo = require "netatmo"
 -- local nasession = netatmo.new {
@@ -351,14 +364,13 @@ end
 -- local query = { ["param1"] = "value1" }
 --
 -- local ok, response_body, status, headers, statusline = nasession:request("/api/attributes", "GET", headers, query, nil)
+-- if not ok then
+--   if response_body == netatmo.ERR_MUST_AUTHORIZE then
+--     -- tell user to login again, tokens expired for some reason
+--   end
+--   -- handle error
+-- end
 function netatmo:request(path, method, headers, query, body)
---  if not self.cookie then
---    -- must login first
---    local ok, err = self:login()
---    if not ok then
---      return ok, err
---    end
---  end
   local access_token, err = get_access_token(self)
   if not access_token then
     return nil, err
@@ -398,7 +410,11 @@ end
 -- -- Make a request where we expect a 200 result
 -- local ok, response_body, status, headers, statusline = nasession:rewrite_error(200, nasession:request("/some/thing", "GET"))
 -- if not ok then
---   return nil, response_body -- a 404 will also follow this path now, since we only want 200's
+--   if response_body == netatmo.ERR_MUST_AUTHORIZE then
+--     -- tell user to login again, tokens expired for some reason
+--   end
+--   -- handle error
+--   -- a 404 will also follow this path now, since we only want 200's
 -- end
 function netatmo:rewrite_error(expected, ok, body, status, headers, ...)
   if not ok then
@@ -432,6 +448,36 @@ end
 --
 -- @section Session
 
+
+-- Mark the start of a refresh call, to prevent simultaneous updates.
+-- @treturn boolean `true` if refresh can start, `false + netatmo.ERR_REFRESH_IN_PROGRESS` otherwise
+function netatmo:refresh_start()
+  if self.refreshing then
+    return false, netatmo.ERR_REFRESH_IN_PROGRESS
+  end
+  self.refreshing = true
+  return true
+end
+
+
+-- Mark the end of a refresh call, to allow a new refresh to start.
+-- @treturn boolean `true`
+function netatmo:refresh_end()
+  self.refreshing = false
+  return true
+end
+
+
+--- Check if the session has been authorized.
+-- @treturn boolean `true` if authorized, `false + netatmo.ERR_MUST_AUTHORIZE` otherwise
+function netatmo:authorized()
+  if not self.refresh_token then
+    return false, netatmo.ERR_MUST_AUTHORIZE
+  end
+  return true
+end
+
+
 --- Sets the refresh token to use for the session.
 -- @tparam string refresh_token the refresh token to use
 function netatmo:set_refresh_token(refresh_token)
@@ -446,6 +492,7 @@ function netatmo:set_refresh_token(refresh_token)
 
   return true
 end
+
 
 --- Gets the authorization url for the user to navigate to to start the OAuth2 flow.
 -- The resulting "code" and "state" values from the callback url can be used
@@ -474,7 +521,7 @@ end
 -- the callback url. It will then extract the `state` and `code` values from the url.
 -- @tparam string state the state value from the callback url, or the callback request, request-url including query args, or the first request line.
 -- @tparam[opt] string code the code value from the callback url (required if `state` is not request-data)
--- @return `true` or nil+err
+-- @return `true` or `nil + err` (this function will never return the `netatmo.ERR_MUST_AUTHORIZE` error)
 function netatmo:authorize(state, code)
   assert(state, "state parameter is missing")
   if state ~= self.state then
@@ -501,6 +548,11 @@ function netatmo:authorize(state, code)
 
   assert(code, "code parameter is missing")
 
+  local ok, err = self:refresh_start()
+  if not ok then
+    return nil, err
+  end
+
   netatmo.log:debug("[netatmo] authorizing session %s", self.state)
   local ok, response_body = self:rewrite_error(200,
     na_request("/oauth2/token", "POST", nil, nil, {
@@ -514,10 +566,11 @@ function netatmo:authorize(state, code)
     })
   )
 
+  self:refresh_end()
+
   if not ok then
     -- authorization failed
     netatmo.log:error("[netatmo] failed to authorize. Error: %s", response_body)
-    self:logout()
     return nil, "authorization failed"
   end
 
@@ -530,49 +583,26 @@ end
 
 --- Logs out of the current session.
 -- There is no real logout option with this API. Hence this only deletes
--- the locally stored tokens. This will make any new calls fail, until a new
--- refresh token has been set.
+-- the locally stored tokens. This will make any new calls fail, until the user logs in again.
 -- @return `true`
--- @usage
--- local netatmo = require "netatmo"
--- local nasession = netatmo.new("abcdef", "xyz", "myself@nothere.com", "secret_password")
--- local ok, err = nasession:login()
--- if not ok then
---   print("failed to login: ", err)
--- else
---   nasession:logout()
--- end
 function netatmo:logout()
   netatmo.log:debug("[netatmo] logout session %s", self.state)
   set_access_token(self, nil, nil)
   self:set_refresh_token(nil)
+  return true
 end
 
 
-
---- Logs in the current session (deprecated).
--- Since the NetAtmo API no longer allows to log in using a password, this method
--- will no longer work. It will always return an error that a new `refresh_token`
--- must be set.
-function netatmo:login()
-  return nil, "login no longer supported, use a refresh_token instead"
-end
-
-
---- Will refresh the access token.
+-- Will refresh the access token.
 -- This will force a refresh of the access token, even if it is still valid.
 -- @return `true` or nil+err
 -- @see expires_in
 -- @see keepalive
 function netatmo:refresh()
-  if not self.refresh_token then
-    return nil, "cannot refresh without a refresh token"
-  end
-
   set_access_token(self, nil, nil) -- clear token to force refresh
 
-  local ok, err = get_access_token(self)
-  if not ok then
+  local token, err = get_access_token(self)
+  if not token then
     return nil, err
   end
 
@@ -580,7 +610,8 @@ function netatmo:refresh()
 end
 
 
---- Gets the remaining time in seconds before the access token expires.
+
+-- Gets the remaining time in seconds before the access token expires.
 -- Returns an error if no refresh token is available.
 -- The returned value can be negative. When the result of this function is
 -- negative, then the `refresh` method should be called to refresh the token.
@@ -589,7 +620,7 @@ end
 -- @see keepalive
 function netatmo:expires_in()
   if not self.refresh_token then
-    return nil, "no refresh token set"
+    return self:authorized()
   end
 
   local now = socket.gettime()
@@ -600,7 +631,10 @@ end
 
 
 --- Keeps the session alive.
--- Wraps around `expires_in` and `refresh` to keep the session alive.
+-- Keeps the session alive by refreshing the access token. If frequent calls are made, then the
+-- refresh should be automatic. If for long periods no calls are made, then this function
+-- can be used to keep the session alive.
+--
 -- Call this function in a loop, delaying each time by the returned number of seconds.
 -- It will only refresh the token if required (other calls can also refresh the
 -- token making an explicit refresh unnecessary).
@@ -684,7 +718,11 @@ function netatmo:get_stations_data(device_id, get_favorites, no_warnings)
         get_favorites = (get_favorites ~= nil and tostring(get_favorites) or nil),
       }))
   if not ok then
-    return nil, "failed to get data: "..response_body
+    if response_body == netatmo.ERR_MUST_AUTHORIZE or
+       response_body == netatmo.ERR_REFRESH_IN_PROGRESS then
+      return nil, response_body -- pass on error as is
+    end
+    return nil, "failed to get data: " .. response_body
   end
 
   if not no_warnings then

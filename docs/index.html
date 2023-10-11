@@ -85,10 +85,10 @@
  the library considers the token to be expired 5 minutes before the actual expiration time.</p>
     <h3>Info:</h3>
     <ul>
-        <li><strong>Copyright</strong>: 2017-2020 Thijs Schreijer</li>
+        <li><strong>Copyright</strong>: 2017-2023 Thijs Schreijer</li>
         <li><strong>Release</strong>: Version 0.1.0, Library to acces the Netatmo API</li>
         <li><strong>License</strong>: netatmo.lua is free software under the MIT/X11 license.</li>
-        <li><strong>Author</strong>: Thijs Schreijer, http://www.thijsschreijer.nl</li>
+        <li><strong>Author</strong>: Thijs Schreijer, https://www.thijsschreijer.nl</li>
     </ul>
 
 
@@ -96,7 +96,7 @@
 <table class="function_list">
 	<tr>
 	<td class="name" nowrap><a href="#netatmo">netatmo</a></td>
-	<td class="summary">The module table</td>
+	<td class="summary">The module table containing some global settings and constants.</td>
 	</tr>
 </table>
 <h2><a href="#Generic_functions">Generic functions </a></h2>
@@ -121,8 +121,8 @@
 	<td class="summary">Authorizes the session.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#expires_in">expires_in ()</a></td>
-	<td class="summary">Gets the remaining time in seconds before the access token expires.</td>
+	<td class="name" nowrap><a href="#authorized">authorized ()</a></td>
+	<td class="summary">Check if the session has been authorized.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#get_authorization_url">get_authorization_url ()</a></td>
@@ -133,16 +133,8 @@
 	<td class="summary">Keeps the session alive.</td>
 	</tr>
 	<tr>
-	<td class="name" nowrap><a href="#login">login ()</a></td>
-	<td class="summary">Logs in the current session (deprecated).</td>
-	</tr>
-	<tr>
 	<td class="name" nowrap><a href="#logout">logout ()</a></td>
 	<td class="summary">Logs out of the current session.</td>
-	</tr>
-	<tr>
-	<td class="name" nowrap><a href="#refresh">refresh ()</a></td>
-	<td class="summary">Will refresh the access token.</td>
 	</tr>
 	<tr>
 	<td class="name" nowrap><a href="#set_refresh_token">set_refresh_token (refresh_token)</a></td>
@@ -173,7 +165,7 @@
     <strong>netatmo</strong>
     </dt>
     <dd>
-    The module table
+    The module table containing some global settings and constants.
 
 
     <h3>Fields:</h3>
@@ -190,6 +182,15 @@
         <li><span class="parameter">DEVICE_TYPES</span>
          A lookup table to convert the <a href="https://www.lua.org/manual/5.1/manual.html#pdf-type">type</a> ID to a description.
  Eg. <code>&quot;NAModule4&quot;</code> -> <code>&quot;Additional indoor module&quot;</code>.
+        </li>
+        <li><span class="parameter">ERR_MUST_AUTHORIZE</span>
+         Error message returned when a call is made without a valid session. This indicates
+ the user must login (again) to authorize the application. See also <a href="index.html#authorized">authorized</a>.
+        </li>
+        <li><span class="parameter">ERR_REFRESH_IN_PROGRESS</span>
+         Error message returned when a refresh is (possibly implict) attempted, but another
+ refresh is already in progress. This is to prevent multiple refreshes from happening
+ simultaneously. When this happens retry shortly after.
         </li>
     </ul>
 
@@ -265,17 +266,9 @@
     <h3>Usage:</h3>
     <ul>
         <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
-<span class="keyword">local</span> nasession = netatmo.new {
-   client_id = <span class="string">"abcdef"</span>,
-   client_secret = <span class="string">"xyz"</span>,
-   refresh_token = <span class="string">"123"</span>,
-   scope = { <span class="string">"read_station"</span>, <span class="string">"read_thermostat"</span> },
-   callback_url = <span class="string">"https://localhost:54321/"</span>,
-   persist = <span class="keyword">function</span>(session, refresh_token) ... <span class="keyword">end</span>,
-}
 
-<span class="comment">-- alternatively:
-</span><span class="keyword">local</span> nasession = netatmo.new {
+<span class="keyword">local</span> must_login = <span class="keyword">false</span>
+<span class="keyword">local</span> nasession = netatmo.new {
    client_id = <span class="string">"abcdef"</span>,
    client_secret = <span class="string">"xyz"</span>,
    scope = { <span class="string">"read_station"</span>, <span class="string">"read_thermostat"</span> },
@@ -283,7 +276,15 @@
 </span>}
 user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have user navigate to this url and authorize
 </span><span class="comment">-- now authorize using the 'state' and 'code' parameters
-</span><span class="global">assert</span>(nasession:authorize(state, code))</pre>
+</span><span class="global">assert</span>(nasession:authorize(state, code))
+
+<span class="keyword">local</span> data, err = nasession:get_modules_data()
+<span class="keyword">if</span> <span class="keyword">not</span> data
+  <span class="keyword">if</span> err == netatmo.ERR_MUST_AUTHORIZE <span class="keyword">then</span>
+    <span class="comment">-- tell user to login again, tokens expired for some reason
+</span>  <span class="keyword">end</span>
+  <span class="comment">-- handle error
+</span><span class="keyword">end</span></pre>
     </ul>
 
 </dd>
@@ -332,7 +333,8 @@ user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have
     <h3>Returns:</h3>
     <ol>
 
-        <code>ok</code>, <code>response_body</code>, <code>response_code</code>, <code>response_headers</code>, <code>response_status_line</code>
+        <code>ok</code>, <code>response_body</code>, <code>response_code</code>, <code>response_headers</code>, <code>response_status_line</code> or
+ <code>nil + err</code>
     </ol>
 
 
@@ -351,7 +353,13 @@ user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have
 <span class="keyword">local</span> headers = { [<span class="string">"My-Header"</span>] = <span class="string">"myvalue"</span> }
 <span class="keyword">local</span> query = { [<span class="string">"param1"</span>] = <span class="string">"value1"</span> }
 
-<span class="keyword">local</span> ok, response_body, status, headers, statusline = nasession:request(<span class="string">"/api/attributes"</span>, <span class="string">"GET"</span>, headers, query, <span class="keyword">nil</span>)</pre>
+<span class="keyword">local</span> ok, response_body, status, headers, statusline = nasession:request(<span class="string">"/api/attributes"</span>, <span class="string">"GET"</span>, headers, query, <span class="keyword">nil</span>)
+<span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
+  <span class="keyword">if</span> response_body == netatmo.ERR_MUST_AUTHORIZE <span class="keyword">then</span>
+    <span class="comment">-- tell user to login again, tokens expired for some reason
+</span>  <span class="keyword">end</span>
+  <span class="comment">-- handle error
+</span><span class="keyword">end</span></pre>
     </ul>
 
 </dd>
@@ -370,7 +378,9 @@ user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have
 </ul>
 
 <p> This reduces the error handling to standard Lua errors, instead of having to
- validate each of the situations above individually.
+ validate each of the situations above individually.</p>
+
+<p> If the status code is a 401 or 403, then the access token will be cleared.
 
 
     <h3>Parameters:</h3>
@@ -407,7 +417,11 @@ user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have
 <span class="comment">-- Make a request where we expect a 200 result
 </span><span class="keyword">local</span> ok, response_body, status, headers, statusline = nasession:rewrite_error(<span class="number">200</span>, nasession:request(<span class="string">"/some/thing"</span>, <span class="string">"GET"</span>))
 <span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
-  <span class="keyword">return</span> <span class="keyword">nil</span>, response_body <span class="comment">-- a 404 will also follow this path now, since we only want 200's
+  <span class="keyword">if</span> response_body == netatmo.ERR_MUST_AUTHORIZE <span class="keyword">then</span>
+    <span class="comment">-- tell user to login again, tokens expired for some reason
+</span>  <span class="keyword">end</span>
+  <span class="comment">-- handle error
+</span>  <span class="comment">-- a 404 will also follow this path now, since we only want 200's
 </span><span class="keyword">end</span></pre>
     </ul>
 
@@ -448,7 +462,7 @@ user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have
     <h3>Returns:</h3>
     <ol>
 
-        <code>true</code> or nil+err
+        <code>true</code> or <code>nil + err</code> (this function will never return the <code>netatmo.ERR_MUST_AUTHORIZE</code> error)
     </ol>
 
 
@@ -456,29 +470,22 @@ user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have
 
 </dd>
     <dt>
-    <a name = "expires_in"></a>
-    <strong>expires_in ()</strong>
+    <a name = "authorized"></a>
+    <strong>authorized ()</strong>
     </dt>
     <dd>
-    Gets the remaining time in seconds before the access token expires.
- Returns an error if no refresh token is available.
- The returned value can be negative. When the result of this function is
- negative, then the <a href="index.html#refresh">refresh</a> method should be called to refresh the token.
+    Check if the session has been authorized.
 
 
 
     <h3>Returns:</h3>
     <ol>
 
-        number of seconds remaining, or nil+err
+           <span class="types"><span class="type">boolean</span></span>
+        <code>true</code> if authorized, <code>false + netatmo.ERR_MUST_AUTHORIZE</code> otherwise
     </ol>
 
 
-    <h3>See also:</h3>
-    <ul>
-         <li><a href="index.html#refresh">refresh</a></li>
-         <li><a href="index.html#keepalive">keepalive</a></li>
-    </ul>
 
 
 </dd>
@@ -510,8 +517,11 @@ user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have
     </dt>
     <dd>
     Keeps the session alive.
- Wraps around <a href="index.html#expires_in">expires_in</a> and <a href="index.html#refresh">refresh</a> to keep the session alive.
- Call this function in a loop, delaying each time by the returned number of seconds.
+ Keeps the session alive by refreshing the access token. If frequent calls are made, then the
+ refresh should be automatic. If for long periods no calls are made, then this function
+ can be used to keep the session alive.</p>
+
+<p> Call this function in a loop, delaying each time by the returned number of seconds.
  It will only refresh the token if required (other calls can also refresh the
  token making an explicit refresh unnecessary).
 
@@ -545,31 +555,13 @@ user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have
 
 </dd>
     <dt>
-    <a name = "login"></a>
-    <strong>login ()</strong>
-    </dt>
-    <dd>
-    Logs in the current session (deprecated).
- Since the NetAtmo API no longer allows to log in using a password, this method
- will no longer work. It will always return an error that a new <code>refresh_token</code>
- must be set.
-
-
-
-
-
-
-
-</dd>
-    <dt>
     <a name = "logout"></a>
     <strong>logout ()</strong>
     </dt>
     <dd>
     Logs out of the current session.
  There is no real logout option with this API. Hence this only deletes
- the locally stored tokens. This will make any new calls fail, until a new
- refresh token has been set.
+ the locally stored tokens. This will make any new calls fail, until the user logs in again.
 
 
 
@@ -580,42 +572,6 @@ user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have
     </ol>
 
 
-
-    <h3>Usage:</h3>
-    <ul>
-        <pre class="example"><span class="keyword">local</span> netatmo = <span class="global">require</span> <span class="string">"netatmo"</span>
-<span class="keyword">local</span> nasession = netatmo.new(<span class="string">"abcdef"</span>, <span class="string">"xyz"</span>, <span class="string">"myself@nothere.com"</span>, <span class="string">"secret_password"</span>)
-<span class="keyword">local</span> ok, err = nasession:login()
-<span class="keyword">if</span> <span class="keyword">not</span> ok <span class="keyword">then</span>
-  <span class="global">print</span>(<span class="string">"failed to login: "</span>, err)
-<span class="keyword">else</span>
-  nasession:logout()
-<span class="keyword">end</span></pre>
-    </ul>
-
-</dd>
-    <dt>
-    <a name = "refresh"></a>
-    <strong>refresh ()</strong>
-    </dt>
-    <dd>
-    Will refresh the access token.
- This will force a refresh of the access token, even if it is still valid.
-
-
-
-    <h3>Returns:</h3>
-    <ol>
-
-        <code>true</code> or nil+err
-    </ol>
-
-
-    <h3>See also:</h3>
-    <ul>
-         <li><a href="index.html#expires_in">expires_in</a></li>
-         <li><a href="index.html#keepalive">keepalive</a></li>
-    </ul>
 
 
 </dd>
@@ -743,7 +699,7 @@ user_url = nasession:get_authorization_url()   <span class="comment">--&gt; have
 </div> <!-- id="main" -->
 <div id="about">
 <i>generated by <a href="http://github.com/stevedonovan/LDoc">LDoc 1.4.6</a></i>
-<i style="float:right;">Last updated 2023-10-05 22:52:46 </i>
+<i style="float:right;">Last updated 2023-10-11 21:29:56 </i>
 </div> <!-- id="about" -->
 </div> <!-- id="container" -->
 </body>
