@@ -29,7 +29,7 @@
 -- @author Thijs Schreijer, https://www.thijsschreijer.nl
 -- @license netatmo.lua is free software under the MIT/X11 license.
 -- @copyright 2017-2023 Thijs Schreijer
--- @release Version 0.1.0, Library to acces the Netatmo API
+-- @release Version 0.2.0, Library to acces the Netatmo API
 -- @module netatmo
 
 local url = require "socket.url"
@@ -64,7 +64,7 @@ local socket = require "socket"
 
 
 local netatmo = {
-  _VERSION = "0.1.0",
+  _VERSION = "0.2.0",
   ERR_MUST_AUTHORIZE = "not logged in, must authorize first",
   ERR_REFRESH_IN_PROGRESS = "refresh is in progress, try again shortly",
 

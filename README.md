@@ -11,7 +11,8 @@ Early development, session management works.
 ## Usage
 
 The NetAtmo api requires an OAuth2 flow to acquire access and refresh token.
-Use the included docker image to get those.
+There is an example showing how to use the Copas scheduler to set up a webserver.
+Or you can use the included docker image to manually get a refresh token.
 
     docker build --tag=netatmo-auth .
     docker run --rm -it -e "CLIENT_ID=xxx" -e "CLIENT_SECRET=xxx" netatmo-auth
@@ -37,10 +38,10 @@ See [LICENSE](https://github.com/Tieske/netatmo.lua/blob/master/LICENSE)
   * Doc comments at module level
   * the `_VERSION` constant
 * add a rockspec for the new version
-* render the docs using `ldoc`
+* render the docs using `ldoc .`
 * commit, tag, and push
 
-### unreleased
+### 0.2.0, released 12-Oct-2022
 
 * breaking: rewite of auth mechanism since password access is no longer supported
 
